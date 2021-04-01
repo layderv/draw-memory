@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Draw addresses</title>
+    <style>
+        .split {
+            height: 100%;
+            width: 50%;
+            position: fixed;
+            top: 0;
+        }
+        .left {
+            left: 5%;
+        }
+        .right {
+            right: 0;
+        }
+        #canvas {
+            display: block;
+            padding-top: 10px;
+            height: 95%;
+        }
+    </style>
+</head>
+<body>
+
+
+<div class="split left" style="width: 100px;">
+    <canvas id="canvas"></canvas>
+</div>
+<div class="split right">
+    <p>
+    <p>Addresses:</p> <textarea id="addresses"></textarea>
+    </p>
+    <p><label for="fontSize">Font size</label> <input id="fontSize" type="text"/></p>
+    <p><label for="lowAddress">Lower address</label> <input id="lowAddress" type="text"/></p>
+    <p><label for="highAddress">Higher address</label> <input id="highAddress" type="text"/></p>
+    <p><input type="checkbox" id="sortAddresses"><label for="sortAddresses">Sort addresses?</label></p>
+    <p>
+        <button id="drawButton" onclick="draw();">Draw</button>
+    </p>
+</div>
+<script>
+    function draw() {
+        const canvas = document.getElementById("canvas");
+        const context = canvas.getContext('2d');
+        const local_pos = {begin: 12, end: canvas.height - 12};
+        const user_pos = {
+            begin: BigInt(document.getElementById('lowAddress').value || 0),
+            end: BigInt(document.getElementById('highAddress').value || (Math.pow(2, 64) - 1))
+        };
+
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        context.beginPath();
+        context.lineWidth = '3';
+        context.strokeStyle = 'black';
+        context.moveTo(0, 0);
+        context.lineTo(local_pos.begin, local_pos.end);
+
+        context.font = (document.getElementById('fontSize').value || '16') + 'px serif';
+
+        const addresses = document.getElementById('addresses').value
+            .split('\n')
+            .map(v => {
+                try {
+                    return BigInt(v);
+                } catch(err) {
+                    return NaN;
+                }})
+            .filter(v => (typeof v) === 'bigint')
+            .sort((a, b) => a > b ? 1 : (a === b ? 0 : -1));
+
+        if (document.getElementById('sortAddresses').checked) {
+            document.getElementById('addresses').value = addresses.map(v => '0x' + v.toString(0x10)).join('\n');
+        }
+
+        for (let addr of addresses) {
+            const mapped = mapPos(user_pos, local_pos, addr);
+            context.fillText('0x' + addr.toString(0x10), 50, Number(mapped));
+        }
+
+        context.stroke();
+    }
+
+    function mapPos(user_pos, local_pos, val) {
+        // map val from user_pos to local_pos
+        const local_pos_bigint = {...local_pos};
+        Object.keys(local_pos_bigint).map(function(key, _index) {
+            local_pos_bigint[key] = BigInt(local_pos_bigint[key]);
+        });
+        return local_pos_bigint.begin + (-local_pos_bigint.begin + local_pos_bigint.end) * (val - user_pos.begin) / (user_pos.end - user_pos.begin);
+    }
+
+    (() => {
+        function resize() {
+            const canvas = document.getElementById("canvas");
+            canvas.height = window.innerHeight;
+            canvas.width = window.innerWidth;
+        }
+        window.addEventListener('resize', () => {
+                resize();
+                draw();
+            }, false);
+        resize();
+
+        document.getElementById('lowAddress').value = '0';
+        document.getElementById('highAddress').value = '0xffffffffffffffff';
+        document.getElementById('fontSize').value = '16';
+    })();
+</script>
+</body>
+</html>
+
